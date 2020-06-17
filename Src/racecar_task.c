@@ -37,7 +37,7 @@ static void RacecarCtrlTaskEntry(void const *argument)
   Pid_t MotorPid;
   int timeout = 0;
   int motorPwm;
-  float steering;
+  float steering = 90.0;
   float v;
   //mini board
   TIM5->CCR1 = LIMIT(RACECAR_SPEED_ZERO, MOTOR_MIN, MOTOR_MAX);
@@ -79,13 +79,22 @@ static void RacecarCtrlTaskEntry(void const *argument)
     else
     {
       timeout++;
-      if (timeout >= 10)
+      if (timeout >= 200/param.ctrl_period)
       {
         v = 0;
         steering = RACECAR_STEER_ANGLE_ZERO;
         timeout = 0;
       }
       motorPwm = PidCalc(&MotorPid, motor_v, v);
+      //skip dead zone
+      if (motorPwm < 0)
+      {
+        motorPwm -= param.racecar.pwm_dead_zone;
+      }
+      else if (motorPwm > 0)
+      {
+        motorPwm += param.racecar.pwm_dead_zone;
+      }
       TIM5->CCR1 = LIMIT(MOTOR_CAL(motorPwm), MOTOR_MIN, MOTOR_MAX);
       TIM5->CCR2 = LIMIT(SERVO_CAL(steering), SERVO_CAL(MID_STEER_ANGLE - param.racecar.max_steer_angle), SERVO_CAL(MID_STEER_ANGLE + param.racecar.max_steer_angle));
     }
