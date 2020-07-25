@@ -19,8 +19,8 @@
 #define ANGLE_CAL(X) (PI-((X)-1500)/2000*PI)
 #define MOTOR_CAL(X) (X + RACECAR_SPEED_ZERO)
 
-#define MOTOR_MAX 1800
-#define MOTOR_MIN 1200
+#define MOTOR_MAX 2000
+#define MOTOR_MIN 1000
 
 #define RACECAR_CTRL_TIMEOUT  1000
 
