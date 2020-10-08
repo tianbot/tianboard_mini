@@ -24,5 +24,9 @@
 
 #define RACECAR_CTRL_TIMEOUT  1000
 
+#define STALL_OR_ENCODER_ERROR_PWM 100
+#define MINIMAL_V 0.05
+
 void RacecarTaskInit(void);
+
 #endif

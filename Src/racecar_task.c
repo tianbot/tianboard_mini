@@ -39,6 +39,7 @@ static void RacecarCtrlTaskEntry(void const *argument)
   int motorPwm;
   float steering = 90.0;
   float v;
+  static int errorFlag = 0;
   //mini board
   TIM5->CCR1 = LIMIT(RACECAR_SPEED_ZERO, MOTOR_MIN, MOTOR_MAX);
   TIM5->CCR2 = LIMIT(SERVO_CAL(RACECAR_STEER_ANGLE_ZERO), SERVO_CAL(MID_STEER_ANGLE - param.racecar.max_steer_angle), SERVO_CAL(MID_STEER_ANGLE + param.racecar.max_steer_angle));
@@ -51,62 +52,85 @@ static void RacecarCtrlTaskEntry(void const *argument)
   osDelay(5000);
   for (;;)
   {
-    evt = osMailGet(CtrlMail, param.ctrl_period);
-
-    if (evt.status == osEventMail)
+    if (errorFlag == 0)
     {
-      timeout = 0;
-      p = evt.value.p;
-      steering = p->steering_angle;
-      v = p->vx;
+      evt = osMailGet(CtrlMail, param.ctrl_period);
 
-      motorPwm = PidCalc(&MotorPid, motor_v, v);
-      steering += 90;
-
-      //skip dead zone
-      if (motorPwm < 0)
+      if ((abs(motorPwm) > STALL_OR_ENCODER_ERROR_PWM) && (motor_v < MINIMAL_V))
       {
-        motorPwm -= param.racecar.pwm_dead_zone;
-      }
-      else if (motorPwm > 0)
-      {
-        motorPwm += param.racecar.pwm_dead_zone;
+        if(errorFlag == 0)
+        {
+          Beep(6, 150);
+          Beep(7, 150);
+          Beep(6, 150);
+          Beep(7, 150);
+        }
+        errorFlag = 1;
+        continue;
       }
 
-      if (v == 0)
+      if (evt.status == osEventMail)
       {
-        motorPwm = 0;
-      }
+        timeout = 0;
+        p = evt.value.p;
+        steering = p->steering_angle;
+        v = p->vx;
 
-      TIM5->CCR1 = LIMIT(MOTOR_CAL(motorPwm), MOTOR_MIN, MOTOR_MAX);
-      TIM5->CCR2 = LIMIT(SERVO_CAL(steering), SERVO_CAL(MID_STEER_ANGLE - param.racecar.max_steer_angle), SERVO_CAL(MID_STEER_ANGLE + param.racecar.max_steer_angle));
-      osMailFree(CtrlMail, p);
+        motorPwm = PidCalc(&MotorPid, motor_v, v);
+        steering += 90;
+
+        //skip dead zone
+        if (motorPwm < 0)
+        {
+          motorPwm -= param.racecar.pwm_dead_zone;
+        }
+        else if (motorPwm > 0)
+        {
+          motorPwm += param.racecar.pwm_dead_zone;
+        }
+
+        if (v == 0)
+        {
+          motorPwm = 0;
+        }
+
+        TIM5->CCR1 = LIMIT(MOTOR_CAL(motorPwm), MOTOR_MIN, MOTOR_MAX);
+        TIM5->CCR2 = LIMIT(SERVO_CAL(steering), SERVO_CAL(MID_STEER_ANGLE - param.racecar.max_steer_angle), SERVO_CAL(MID_STEER_ANGLE + param.racecar.max_steer_angle));
+        osMailFree(CtrlMail, p);
+      }
+      else
+      {
+        timeout++;
+        if (timeout >= 200 / param.ctrl_period)
+        {
+          v = 0;
+          steering = RACECAR_STEER_ANGLE_ZERO;
+          timeout = 0;
+        }
+        motorPwm = PidCalc(&MotorPid, motor_v, v);
+        //skip dead zone
+        if (motorPwm < 0)
+        {
+          motorPwm -= param.racecar.pwm_dead_zone;
+        }
+        else if (motorPwm > 0)
+        {
+          motorPwm += param.racecar.pwm_dead_zone;
+        }
+
+        if (v == 0)
+        {
+          motorPwm = 0;
+        }
+
+        TIM5->CCR1 = LIMIT(MOTOR_CAL(motorPwm), MOTOR_MIN, MOTOR_MAX);
+        TIM5->CCR2 = LIMIT(SERVO_CAL(steering), SERVO_CAL(MID_STEER_ANGLE - param.racecar.max_steer_angle), SERVO_CAL(MID_STEER_ANGLE + param.racecar.max_steer_angle));
+      }
     }
     else
     {
-      timeout++;
-      if (timeout >= 200 / param.ctrl_period)
-      {
-        v = 0;
-        steering = RACECAR_STEER_ANGLE_ZERO;
-        timeout = 0;
-      }
-      motorPwm = PidCalc(&MotorPid, motor_v, v);
-      //skip dead zone
-      if (motorPwm < 0)
-      {
-        motorPwm -= param.racecar.pwm_dead_zone;
-      }
-      else if (motorPwm > 0)
-      {
-        motorPwm += param.racecar.pwm_dead_zone;
-      }
-
-      if (v == 0)
-      {
-        motorPwm = 0;
-      }
-
+      motorPwm = 0;
+      steering = RACECAR_STEER_ANGLE_ZERO;
       TIM5->CCR1 = LIMIT(MOTOR_CAL(motorPwm), MOTOR_MIN, MOTOR_MAX);
       TIM5->CCR2 = LIMIT(SERVO_CAL(steering), SERVO_CAL(MID_STEER_ANGLE - param.racecar.max_steer_angle), SERVO_CAL(MID_STEER_ANGLE + param.racecar.max_steer_angle));
     }
@@ -139,7 +163,7 @@ static void RacecarFeedbackTaskEntry(void const *argument)
 static void RacecarPoseTaskEntry(void const *argument)
 {
   int DeltaTicks;
-  uint16_t ticks = 0;
+  static uint16_t ticks = 0;
   uint16_t preTicks = 0;
   float delta_m;
 
