@@ -39,7 +39,8 @@ static void RacecarCtrlTaskEntry(void const *argument)
   int motorPwm;
   float steering = 90.0;
   float v;
-  static int errorFlag = 0;
+  int errorFlag = 0;
+  int errorCount = 0;
   //mini board
   TIM5->CCR1 = LIMIT(RACECAR_SPEED_ZERO, MOTOR_MIN, MOTOR_MAX);
   TIM5->CCR2 = LIMIT(SERVO_CAL(RACECAR_STEER_ANGLE_ZERO), SERVO_CAL(MID_STEER_ANGLE - param.racecar.max_steer_angle), SERVO_CAL(MID_STEER_ANGLE + param.racecar.max_steer_angle));
@@ -56,18 +57,28 @@ static void RacecarCtrlTaskEntry(void const *argument)
     {
       evt = osMailGet(CtrlMail, param.ctrl_period);
 
-      if ((abs(motorPwm) > STALL_OR_ENCODER_ERROR_PWM) && (motor_v < MINIMAL_V))
-      {
-        if(errorFlag == 0)
-        {
-          Beep(6, 150);
-          Beep(7, 150);
-          Beep(6, 150);
-          Beep(7, 150);
-        }
-        errorFlag = 1;
-        continue;
-      }
+      // if ((abs(motorPwm) > STALL_OR_ENCODER_ERROR_PWM) && (fabs(motor_v) < MINIMAL_V))
+      // {
+      //   errorCount++;
+      //   if (errorCount > 10)
+      //   {
+      //     if (errorFlag == 0)
+      //     {
+      //       Beep(6, 500);
+      //       Beep(7, 500);
+      //       Beep(6, 500);
+      //       Beep(7, 500);
+      //       Beep(6, 500);
+      //       Beep(7, 500);
+      //     }
+      //     errorFlag = 1;
+      //     continue;
+      //   }
+      // }
+      // else
+      // {
+      //   errorCount = 0;
+      // }
 
       if (evt.status == osEventMail)
       {
