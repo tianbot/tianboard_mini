@@ -41,6 +41,7 @@ static void RacecarCtrlTaskEntry(void const *argument)
   float v;
   int errorFlag = 0;
   int errorCount = 0;
+  int moveDir = MOVE_DIR_FORWARD;
   //mini board
   TIM5->CCR1 = LIMIT(RACECAR_SPEED_ZERO, MOTOR_MIN, MOTOR_MAX);
   TIM5->CCR2 = LIMIT(SERVO_CAL(RACECAR_STEER_ANGLE_ZERO), SERVO_CAL(MID_STEER_ANGLE - param.racecar.max_steer_angle), SERVO_CAL(MID_STEER_ANGLE + param.racecar.max_steer_angle));
@@ -103,6 +104,30 @@ static void RacecarCtrlTaskEntry(void const *argument)
         if (v == 0)
         {
           motorPwm = 0;
+        }
+        if ((moveDir == MOVE_DIR_FORWARD) && (v < 0)) //generate brake pwm
+        {
+          TIM5->CCR1 = 1200;
+          while (motor_v != 0)
+          {
+            osDelay(10);
+          }
+          osDelay(100);
+          TIM5->CCR1 = 1500;
+          osDelay(100);
+          moveDir = MOVE_DIR_BACKWARD;
+          do
+          {
+            evt = osMailGet(CtrlMail, 0);
+            if (evt.status == osEventMail)
+            {
+              osMailFree(CtrlMail, evt.value.p);
+            }
+          } while (evt.status == osEventMail); //drop all ctrl cmd during brake
+        }
+        else if (v > 0)
+        {
+          moveDir = MOVE_DIR_FORWARD;
         }
 
         TIM5->CCR1 = LIMIT(MOTOR_CAL(motorPwm), MOTOR_MIN, MOTOR_MAX);

@@ -7,7 +7,7 @@
 #define DBUS_MSG_LEN	20
 
 #define DBUS_MSG_QUENE_SIZE 8
-#define CTRL_MSG_QUENE_SIZE 3
+#define CTRL_MSG_QUENE_SIZE 16
 
 #define CTRL_TYPE_DBUS_RC 0
 #define CTRL_TYPE_PC      1

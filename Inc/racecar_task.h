@@ -27,6 +27,9 @@
 #define STALL_OR_ENCODER_ERROR_PWM 100
 #define MINIMAL_V 0.05
 
+#define MOVE_DIR_FORWARD 0
+#define MOVE_DIR_BACKWARD 1
+
 void RacecarTaskInit(void);
 
 #endif
