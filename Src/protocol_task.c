@@ -223,6 +223,7 @@ static void ProtocolRecvTaskEntry(void const *argument)
           pMotionData->vx = 0;
           pMotionData->vy = 0;
           pMotionData->w = 0;
+          pMotionData->steering_angle = 0;
           osMailPut(CtrlMail, pMotionData);
         }
       }
