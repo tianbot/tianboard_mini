@@ -17,5 +17,5 @@ extern osMailQId BeepMail;
 extern osThreadId BeepTaskHandle;
 
 void BeepTaskInit(void);
-void Beep(uint8_t sound, uint8_t time);
+void Beep(uint16_t sound, uint16_t time);
 #endif

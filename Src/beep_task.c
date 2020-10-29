@@ -7,7 +7,7 @@
 osThreadId BeepTaskHandle;
 osMailQId BeepMail;
 osMailQDef(BeepMail, BEEP_MSG_QUENE_SIZE, BeepMsg_t);
-void Beep(uint8_t sound, uint8_t time)
+void Beep(uint16_t sound, uint16_t time)
 {
   BeepMsg_t *p;
   p = osMailAlloc(BeepMail, 0);

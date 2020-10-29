@@ -12,6 +12,7 @@
 #include "stdlib.h"
 #include "math.h"
 #include "pid.h"
+#include "beep_task.h"
 
 osThreadId RacecarCtrlTaskHandle;
 osThreadId RacecarFeedbackTaskHandle;
@@ -57,29 +58,29 @@ static void RacecarCtrlTaskEntry(void const *argument)
     if (errorFlag == 0)
     {
       evt = osMailGet(CtrlMail, param.ctrl_period);
-
-      // if ((abs(motorPwm) > STALL_OR_ENCODER_ERROR_PWM) && (fabs(motor_v) < MINIMAL_V))
-      // {
-      //   errorCount++;
-      //   if (errorCount > 10)
-      //   {
-      //     if (errorFlag == 0)
-      //     {
-      //       Beep(6, 500);
-      //       Beep(7, 500);
-      //       Beep(6, 500);
-      //       Beep(7, 500);
-      //       Beep(6, 500);
-      //       Beep(7, 500);
-      //     }
-      //     errorFlag = 1;
-      //     continue;
-      //   }
-      // }
-      // else
-      // {
-      //   errorCount = 0;
-      // }
+      int pwm = TIM5->CCR1 - 1500;
+      if (((pwm > STALL_OR_ENCODER_ERROR_PWM) && (fabs(motor_v) < MINIMAL_V)) || ((pwm < -STALL_OR_ENCODER_ERROR_PWM) && (fabs(motor_v) < MINIMAL_V)))
+      {
+        errorCount++;
+        if (errorCount > 30)
+        {
+          if (errorFlag == 0)
+          {
+            Beep(1, 500);
+            Beep(6, 500);
+            Beep(1, 500);
+            Beep(6, 500);
+            Beep(1, 500);
+            Beep(6, 500);
+          }
+          errorFlag = 1;
+          continue;
+        }
+      }
+      else
+      {
+        errorCount = 0;
+      }
 
       if (evt.status == osEventMail)
       {
@@ -88,6 +89,14 @@ static void RacecarCtrlTaskEntry(void const *argument)
         steering = p->steering_angle;
         v = p->vx;
 
+        if (v > 0 && v < 0.3)
+        {
+          v = 0.3;
+        }
+        else if (v < 0 && v > -0.25)
+        {
+          v = -0.25;
+        }
         motorPwm = PidCalc(&MotorPid, motor_v, v);
         steering += 90;
 
@@ -105,6 +114,7 @@ static void RacecarCtrlTaskEntry(void const *argument)
         {
           motorPwm = 0;
         }
+
         if ((moveDir == MOVE_DIR_FORWARD) && (v < 0)) //generate brake pwm
         {
           TIM5->CCR1 = 1200;
