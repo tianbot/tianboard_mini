@@ -1,4 +1,5 @@
 #include "pid.h"
+#include "string.h"
 
 #define ABS(x) ((x > 0) ? (x) : (-x))
 
@@ -19,6 +20,7 @@ void PidInit(
     float ki,
     float kd)
 {
+  memset(pid, 0, sizeof(Pid_t));
   pid->IntegralLimit = intergral_limit;
   pid->MaxOutput = maxout;
   pid->pid_mode = mode;

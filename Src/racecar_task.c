@@ -31,6 +31,38 @@ typedef struct Position
 static Pos_t pose;
 float motor_v;
 
+volatile uint32_t heartbeat = 1;
+
+TIM_HandleTypeDef htim7;
+HAL_StatusTypeDef MX_TIM7_Init(void)
+{
+  HAL_NVIC_SetPriority(TIM7_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(TIM7_IRQn);
+  __HAL_RCC_TIM7_CLK_ENABLE();
+
+  /* Initialize TIM6 */
+  htim7.Instance = TIM7;
+
+  /* Initialize TIMx peripheral as follow:
+  + Period = [(TIM6CLK/1000) - 1]. to have a (1/1000) s time base.
+  + Prescaler = (uwTimclock/1000000 - 1) to have a 1MHz counter clock.
+  + ClockDivision = 0
+  + Counter direction = Up
+  */
+  htim7.Init.Period = 20000 - 1;
+  htim7.Init.Prescaler = 8400 - 1;
+  htim7.Init.ClockDivision = 0;
+  htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
+  if (HAL_TIM_Base_Init(&htim7) == HAL_OK)
+  {
+    /* Start the TIM time Base generation in interrupt mode */
+    return HAL_TIM_Base_Start_IT(&htim7);
+  }
+
+  /* Return function status */
+  return HAL_ERROR;
+}
+
 static void RacecarCtrlTaskEntry(void const *argument)
 {
   osEvent evt;
@@ -43,6 +75,10 @@ static void RacecarCtrlTaskEntry(void const *argument)
   int errorFlag = 0;
   int errorCount = 0;
   int moveDir = MOVE_DIR_FORWARD;
+  float speed[3] = {0};
+  float sum;
+  int speedIndex = 0;
+  int i;
   //mini board
   TIM5->CCR1 = LIMIT(RACECAR_SPEED_ZERO, MOTOR_MIN, MOTOR_MAX);
   TIM5->CCR2 = LIMIT(SERVO_CAL(RACECAR_STEER_ANGLE_ZERO), SERVO_CAL(MID_STEER_ANGLE - param.racecar.max_steer_angle), SERVO_CAL(MID_STEER_ANGLE + param.racecar.max_steer_angle));
@@ -53,37 +89,28 @@ static void RacecarCtrlTaskEntry(void const *argument)
   PidInit(&MotorPid, POSITION_PID, param.pid.max_out, param.pid.i_limit, param.pid.p, param.pid.i, param.pid.d);
 
   osDelay(5000);
+  MX_TIM7_Init(); //check heartbeat for ctrl task
   for (;;)
   {
+    heartbeat++;
     if (errorFlag == 0)
     {
       evt = osMailGet(CtrlMail, param.ctrl_period);
-      int pwm = TIM5->CCR1 - 1500;
-      if (((pwm > STALL_OR_ENCODER_ERROR_PWM) && (fabs(motor_v) < MINIMAL_V)) || ((pwm < -STALL_OR_ENCODER_ERROR_PWM) && (fabs(motor_v) < MINIMAL_V)))
-      {
-        errorCount++;
-        if (errorCount > 30)
-        {
-          if (errorFlag == 0)
-          {
-            Beep(1, 500);
-            Beep(6, 500);
-            Beep(1, 500);
-            Beep(6, 500);
-            Beep(1, 500);
-            Beep(6, 500);
-          }
-          errorFlag = 1;
-          continue;
-        }
-      }
-      else
-      {
-        errorCount = 0;
-      }
 
       if (evt.status == osEventMail)
       {
+        speed[speedIndex] = motor_v;
+        speedIndex = (speedIndex + 1) % 3;
+        sum = 0;
+        for (i = 0; i < 3; i++)
+        {
+          sum += speed[i];
+        }
+        if (sum > 0.9)
+        {
+          moveDir = MOVE_DIR_FORWARD;
+        }
+
         timeout = 0;
         p = evt.value.p;
         steering = p->steering_angle;
@@ -93,13 +120,13 @@ static void RacecarCtrlTaskEntry(void const *argument)
         {
           v = 0.3;
         }
-        else if (v < 0 && v > -0.25)
+        else if (v < 0 && v > -0.3)
         {
-          v = -0.25;
+          v = -0.3;
         }
         motorPwm = PidCalc(&MotorPid, motor_v, v);
         steering += 90;
-
+        //motorPwm = v / param.max_speed * 500;
         //skip dead zone
         if (motorPwm < 0)
         {
@@ -113,14 +140,19 @@ static void RacecarCtrlTaskEntry(void const *argument)
         if (v == 0)
         {
           motorPwm = 0;
+          PidInit(&MotorPid, POSITION_PID, param.pid.max_out, param.pid.i_limit, param.pid.p, param.pid.i, param.pid.d);
         }
 
         if ((moveDir == MOVE_DIR_FORWARD) && (v < 0)) //generate brake pwm
         {
           TIM5->CCR1 = 1200;
-          while (motor_v != 0)
+          while (motor_v > 0)
           {
             osDelay(10);
+          }
+          for (i = 0; i < 3; i++)
+          {
+            speed[i] = 0;
           }
           osDelay(100);
           TIM5->CCR1 = 1500;
@@ -133,13 +165,35 @@ static void RacecarCtrlTaskEntry(void const *argument)
             {
               osMailFree(CtrlMail, evt.value.p);
             }
+            else
+            {
+              break;
+            }
           } while (evt.status == osEventMail); //drop all ctrl cmd during brake
         }
-        else if (v > 0)
+        int pwm = TIM5->CCR1 - 1500;
+        if (((pwm > STALL_OR_ENCODER_ERROR_PWM) && (fabs(motor_v) < MINIMAL_V)) || ((pwm < -STALL_OR_ENCODER_ERROR_PWM) && (fabs(motor_v) < MINIMAL_V)))
         {
-          moveDir = MOVE_DIR_FORWARD;
+          errorCount++;
+          if (errorCount > 150)
+          {
+            if (errorFlag == 0)
+            {
+              Beep(1, 500);
+              Beep(6, 500);
+              Beep(1, 500);
+              Beep(6, 500);
+              Beep(1, 500);
+              Beep(6, 500);
+            }
+            errorFlag = 1;
+            continue;
+          }
         }
-
+        else
+        {
+          errorCount = 0;
+        }
         TIM5->CCR1 = LIMIT(MOTOR_CAL(motorPwm), MOTOR_MIN, MOTOR_MAX);
         TIM5->CCR2 = LIMIT(SERVO_CAL(steering), SERVO_CAL(MID_STEER_ANGLE - param.racecar.max_steer_angle), SERVO_CAL(MID_STEER_ANGLE + param.racecar.max_steer_angle));
         osMailFree(CtrlMail, p);
@@ -167,8 +221,8 @@ static void RacecarCtrlTaskEntry(void const *argument)
         if (v == 0)
         {
           motorPwm = 0;
+          PidInit(&MotorPid, POSITION_PID, param.pid.max_out, param.pid.i_limit, param.pid.p, param.pid.i, param.pid.d);
         }
-
         TIM5->CCR1 = LIMIT(MOTOR_CAL(motorPwm), MOTOR_MIN, MOTOR_MAX);
         TIM5->CCR2 = LIMIT(SERVO_CAL(steering), SERVO_CAL(MID_STEER_ANGLE - param.racecar.max_steer_angle), SERVO_CAL(MID_STEER_ANGLE + param.racecar.max_steer_angle));
       }
@@ -191,6 +245,7 @@ static void RacecarFeedbackTaskEntry(void const *argument)
     odom.pose.point.x = pose.position_x_m;
     odom.pose.point.y = pose.position_y_m;
     odom.pose.point.z = 0;
+    //odom.pose.point.z = (TIM5->CCR1 - 1500.0) / 100.0;
     odom.pose.yaw = pose.yaw;
     odom.twist.angular.x = 0;
     odom.twist.angular.y = 0;
@@ -261,7 +316,7 @@ static void RacecarPoseTaskEntry(void const *argument)
     osDelay(param.pose_calc_period);
   }
 }
-osThreadDef(RacecarCtrlTask, RacecarCtrlTaskEntry, osPriorityAboveNormal, 0, 512);
+osThreadDef(RacecarCtrlTask, RacecarCtrlTaskEntry, osPriorityAboveNormal, 0, 1024);
 osThreadDef(RacecarFeedbackTask, RacecarFeedbackTaskEntry, osPriorityAboveNormal, 0, 512);
 osThreadDef(RacecarPoseTask, RacecarPoseTaskEntry, osPriorityAboveNormal, 0, 512);
 void RacecarTaskInit(void)

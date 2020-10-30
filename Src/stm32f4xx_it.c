@@ -68,7 +68,8 @@ extern UART_HandleTypeDef huart3;
 extern TIM_HandleTypeDef htim6;
 
 /* USER CODE BEGIN EV */
-
+extern TIM_HandleTypeDef htim7;
+extern uint32_t heartbeat;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -307,6 +308,22 @@ void DMA2_Stream2_IRQHandler(void)
 }
 
 /* USER CODE BEGIN 1 */
-
+void TIM7_IRQHandler(void)
+{
+  if (__HAL_TIM_GET_FLAG(&htim7, TIM_FLAG_UPDATE) != RESET)
+  {
+    if (__HAL_TIM_GET_IT_SOURCE(&htim7, TIM_IT_UPDATE) != RESET)
+    {
+      static uint32_t OldValue = 0;
+      __HAL_TIM_CLEAR_IT(&htim7, TIM_IT_UPDATE);
+      if(OldValue == heartbeat)
+      {
+        TIM5->CCR1 = 1500;
+        while(1);
+      }
+      OldValue = heartbeat;
+    }
+  }
+}
 /* USER CODE END 1 */
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
