@@ -71,7 +71,7 @@ static void DbusTaskEntry(void const *argument)
           }
 
           pMotionData->vx = (CtrlData.rc.ch3 - RC_CH_VALUE_OFFSET) * param.max_speed / ((RC_CH_VALUE_MAX - RC_CH_VALUE_MIN)/2);
-          pMotionData->steering_angle = (CtrlData.rc.ch4 - RC_CH_VALUE_OFFSET) * param.racecar.max_steer_angle / ((RC_CH_VALUE_MAX - RC_CH_VALUE_MIN)/2);
+          pMotionData->steering_angle = -(CtrlData.rc.ch0 - RC_CH_VALUE_OFFSET) * param.racecar.max_steer_angle / ((RC_CH_VALUE_MAX - RC_CH_VALUE_MIN)/2);
           osMailPut(CtrlMail, pMotionData);
         }
       }
