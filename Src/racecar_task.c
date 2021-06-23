@@ -290,6 +290,7 @@ static void RacecarPoseTaskEntry(void const *argument)
     {
       DeltaTicks = (int16_t)(preTicks - ticks);
     }
+    DeltaTicks = -DeltaTicks;
     preTicks = ticks;
     delta_m = (float)DeltaTicks / param.ticks_per_lap * 2 * PI * param.wheel_r / param.motor_reduction_ratio;
     motor_v = delta_m / param.pose_calc_period * 1000.0f; // m/s
