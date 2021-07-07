@@ -16,7 +16,7 @@
 #define MID_STEER_ANGLE 90
 
 #define SERVO_CAL(X) ((2500 - 500)*(180-X)/180+500)
-#define ANGLE_CAL(X) (PI-((X)-1500)/2000*PI)
+#define ANGLE_CAL(X) (-((X)-1500)/1000.0*PI/2.0)
 #define MOTOR_CAL(X) (X + RACECAR_SPEED_ZERO)
 
 #define MOTOR_MAX 2000

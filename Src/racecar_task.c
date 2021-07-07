@@ -142,7 +142,7 @@ static void RacecarPoseTaskEntry(void const *argument)
   uint16_t ticks = 0;
   uint16_t preTicks = 0;
   float delta_m;
-
+  int ccr;
   float angle;
   memset(&pose, 0, sizeof(pose));
   for (;;)
@@ -168,9 +168,9 @@ static void RacecarPoseTaskEntry(void const *argument)
     preTicks = ticks;
     delta_m = (float)DeltaTicks / param.ticks_per_lap * 2 * PI * param.wheel_r / param.motor_reduction_ratio;
     motor_v = delta_m / param.pose_calc_period * 1000.0f; // m/s
-
-    pose.wz = motor_v * tan(ANGLE_CAL(TIM5->CCR2)) / 2 / param.racecar.base_b;
-    pose.yaw += delta_m * tan(ANGLE_CAL(TIM5->CCR2)) / 2 / param.racecar.base_b;
+    ccr = TIM5->CCR2;
+    pose.wz = motor_v * tan(ANGLE_CAL(ccr)) / 2 / param.racecar.base_b;
+    pose.yaw += delta_m * tan(ANGLE_CAL(ccr)) / 2 / param.racecar.base_b;
     if (pose.yaw > PI)
     {
       pose.yaw -= 2 * PI;
